@@ -1,0 +1,423 @@
+mdl 1.7;
+
+import ::anno::*;
+import ::base::*;
+import ::state::*;
+import ::tex::*;
+import ::math::*;
+
+export struct triangle_grid_sample
+{
+    int2 vertex_1 = int2(0);
+    int2 vertex_2 = int2(0);
+    int2 vertex_3 = int2(0);
+    float w_1 	  = 0.f;
+    float w_2 	  = 0.f;
+    float w_3 	  = 0.f;
+    int2 base_id  = int2(0);
+	float a_1 	  = 0.f;
+	float a_2 	  = 0.f;
+	float a_3 	  = 0.f;
+	float2 uv_1   = float2(0);
+	float2 uv_2   = float2(0);
+	float2 uv_3   = float2(0);
+};
+
+export float3 tbn(
+	float3 raw_normal,
+	uniform int uv_index = 0
+)[[ anno::hidden() ]]{
+	float3 normal 	 = raw_normal * 2.0 - 1.0;
+	float2 normal_xy = float2( normal.x, normal.y );
+	float normal_z   = math::sqrt( math::saturate( 1.0 - math::dot( normal_xy, normal_xy ) ) );
+	normal.z 		 = normal_z;
+
+	base::texture_coordinate_info coord_info_uvw = base::coordinate_source( coordinate_system:
+																			base::texture_coordinate_uvw,
+																			texture_space: uv_index );
+	float3 T = coord_info_uvw.tangent_u;
+	float3 B = coord_info_uvw.tangent_v;
+	float3 N = state::normal();
+
+	normal = normal.x * T + normal.y * B + normal.z * N;
+	return math::normalize( normal );
+}
+
+export float3 raw_to_normal(
+    float3 raw
+)[[ anno::hidden() ]]{
+	float3 normal = raw * 2.0 - 1.0;
+	float2 xy     = float2( normal.x, normal.y );
+	float  z      = math::sqrt( math::saturate( 1.0 - math::dot( xy, xy ) ) );
+    return math::normalize( float3( xy.x, xy.y, z ) );
+}
+
+export float3 normal_to_raw(
+    float3 normal
+)[[ anno::hidden() ]]{
+    return normal * 0.5 + 0.5;
+}
+
+export float2 hex_center(int2 vertex)[[ anno::hidden() ]]{
+    float2x2 inv_skew = float2x2(1.0, 0.5, 0.0, 1.0 / 1.15470054);
+    return (vertex * inv_skew) / (2.0 * math::sqrt(3.0));
+}
+
+export float get_rotation_angle(int2 idx)[[ anno::hidden() ]]{
+    float angle_in = math::abs(idx.x * idx.y) + math::abs(idx.x + idx.y) + math::PI;
+
+    // remap to +/- pi
+    float angle = math::fmod(angle_in, 2 * math::PI);
+    if (angle < 0) angle += 2 * math::PI;
+    if (angle > math::PI) angle -= 2 * math::PI;
+    return angle;
+}
+
+export float2x2 rotation_2d(float angle)[[ anno::hidden() ]]{
+    float c = math::cos(angle);
+    float s = math::sin(angle);
+
+    return float2x2(c, -s, s, c);
+}
+
+export float3 rotate_normal(
+    float3 normal,
+    float angle
+)[[ anno::hidden() ]]{
+    float  c              = math::cos(angle);
+    float  s              = math::sin(angle);
+    float3 rotated_normal = normal;
+	rotated_normal.x      = c * normal.x + s * normal.y;
+	rotated_normal.y      = c * normal.y - s * normal.x;
+    return rotated_normal;
+}
+
+export int pcg(int v)[[ anno::hidden() ]]{
+    int state = v * 747796405 + 2891336453;
+    int word = ((state >>> ((state >>> 28) + 4)) ^ state) * 277803737;
+    return (word >>> 22) ^ word;
+}
+
+export int2 pcg2d(int2 v)[[ anno::hidden() ]]{
+    v = v * 1664525 + 1013904223;
+
+    v.x += v.y * 1664525;
+    v.y += v.x * 1664525;
+
+    v = v ^ (v >>> 16);
+
+    v.x += v.y * 1664525;
+    v.y += v.x * 1664525;
+
+    v = v ^ (v >>> 16);
+
+    return v;
+}
+
+export int3 pcg3d(int3 v)[[ anno::hidden() ]]{
+    v = v * 1664525 + 1013904223;
+
+    v.x += v.y*v.z;
+    v.y += v.z*v.x;
+    v.z += v.x*v.y;
+
+    v ^= v >>> 16;
+
+    v.x += v.y*v.z;
+    v.y += v.z*v.x;
+    v.z += v.x*v.y;
+
+    return v;
+}
+
+export int4 pcg4d(int4 v)[[ anno::hidden() ]]{
+    v = v * 1664525 + 1013904223;
+    
+    v.x += v.y*v.w;
+    v.y += v.z*v.x;
+    v.z += v.x*v.y;
+    v.w += v.y*v.z;
+    
+    v ^= v >>> 16;
+    
+    v.x += v.y*v.w;
+    v.y += v.z*v.x;
+    v.z += v.x*v.y;
+    v.w += v.y*v.z;
+    
+    return v;
+}
+
+export float uni01(int i)[[ anno::hidden() ]]{
+    if (i >= 0) {
+        return float(i) / 4294967295.0;
+    } else {
+        return float(i >>> 1)/ 2147483647.0;
+    }
+}
+
+export float2 uni01(int2 i)[[ anno::hidden() ]]{
+    return float2(uni01(i.x), uni01(i.y));
+}
+
+export float2 hash_2i_2f(int2 v)[[ anno::hidden() ]]{
+    return uni01(pcg2d(v));
+}
+
+export triangle_grid_sample initialize_triangle_grid(
+	float2 uv = float2(state::texture_coordinate(0).x, state::texture_coordinate(0).y)
+    [[ anno::display_name("UV Coordinates")]]
+)
+[[ anno::display_name("Triangle Grid"),
+   anno::in_group("Hexagonal") ]]
+{
+    triangle_grid_sample tgs;
+    uv *= 2 * math::sqrt(3.0);
+
+    float2x2 grid_to_skewed_grid = float2x2(1.0, -0.57735027, 0.0, 1.15470054);
+    float2 skewed_coord 		 = uv * grid_to_skewed_grid;
+
+    int2 base_id 	  = int2(math::floor(skewed_coord));
+    float2 frac_coord = math::frac(skewed_coord);
+    float3 temp 	  = float3(frac_coord.x, frac_coord.y, 0.0);
+    temp.z 			  = 1.0 - temp.x - temp.y;
+
+    float s 		= math::step(0.0, -temp.z);
+    float s2 		= 2 * s - 1;
+
+    float w_1 		= -temp.z * s2;
+    float w_2 		= s - temp.y * s2;
+    float w_3 		= s - temp.x * s2;
+
+    int2 vertex_1 	 = int2( int(math::floor(skewed_coord.x) + s),       int(math::floor(skewed_coord.y) + s) );
+    int2 vertex_2    = int2( int(math::floor(skewed_coord.x) + s),       int(math::floor(skewed_coord.y) + (1 - s)) );
+    int2 vertex_3    = int2( int(math::floor(skewed_coord.x) + (1 - s)), int(math::floor(skewed_coord.y) + s) );
+
+    tgs.vertex_1     = vertex_1;
+    tgs.vertex_2     = vertex_2;
+    tgs.vertex_3     = vertex_3;
+    tgs.w_1         = w_1;
+    tgs.w_2         = w_2;
+    tgs.w_3         = w_3;
+    tgs.base_id     = base_id;
+
+    float a_1 		= get_rotation_angle( vertex_1 );
+	float a_2 		= get_rotation_angle( vertex_2 );
+	float a_3 		= get_rotation_angle( vertex_3 );
+
+	float2x2 rot_1 	= rotation_2d( a_1 );
+	float2x2 rot_2 	= rotation_2d( a_2 );
+	float2x2 rot_3 	= rotation_2d( a_3 );
+
+	float2 center_1 = hex_center( vertex_1 );
+	float2 center_2 = hex_center( vertex_2 );
+	float2 center_3 = hex_center( vertex_3 );
+
+	tgs.a_1 = a_1;
+	tgs.a_2 = a_2;
+	tgs.a_3 = a_3;
+
+	tgs.uv_1 = ( uv - center_1 ) * rot_1 + center_1 + hash_2i_2f( vertex_1 );
+	tgs.uv_2 = ( uv - center_2 ) * rot_2 + center_2 + hash_2i_2f( vertex_2 );
+	tgs.uv_3 = ( uv - center_3 ) * rot_3 + center_3 + hash_2i_2f( vertex_3 );
+
+    return tgs;
+}
+
+float n_rand( float2 spatial, float temporal )[[ anno::hidden() ]]{
+    return math::frac( temporal + math::sin( math::dot( spatial, float2( 12.9898f, 78.233f ) ) ) * 43758.5453f );
+}
+
+export float dithered_noise(
+    float2 spatial = 0,
+    float temporal = state::animation_time()
+)[[ anno::hidden() ]]{
+    float2 spatial_int = math::floor( spatial );
+    float noise_plus_pattern = ( spatial_int.x + ( spatial_int.y * 2.0f ) + temporal ) * ( 1.0f / 5.0f );
+    float noise_fine = n_rand( spatial, temporal );
+    return math::frac( noise_plus_pattern + noise_fine );
+}
+
+export float dithered_noise_ws()[[ anno::hidden() ]]{
+    base::texture_coordinate_info uvw = base::coordinate_projection(
+                                            coordinate_system: base::texture_coordinate_world,
+                                            projection_type: base::projection_cubic );
+
+    return dithered_noise( float2(uvw.position.x, uvw.position.y), 0 );    
+}
+
+export float3 calculate_weight( triangle_grid_sample tgs,
+								float3 dw, 
+								float contrast = 0.6f,
+								float weight_exponent = 7.0f )[[ anno::hidden() ]]{
+	
+	dw            = math::lerp( float3(1.0f), dw, contrast );
+	float3 weight = dw * math::pow( float3( tgs.w_1, tgs.w_2, tgs.w_3 ), weight_exponent );
+	weight 		 /= ( weight.x + weight.y + weight.z );
+
+	return weight;
+}
+
+export color sample_color_hex( triangle_grid_sample tgs
+                                [[anno::display_name("Triangle Grid")]],
+                               uniform texture_2d tex
+                                [[anno::display_name("Texture")]],
+                               color default_color = color( 0.5 )
+                                [[anno::display_name("Default Color")]],                              
+                               uniform tex::wrap_mode wrap_u = tex::wrap_repeat
+                                [[anno::display_name("Wrap U")]],
+                               uniform tex::wrap_mode wrap_v = tex::wrap_repeat 
+                                [[anno::display_name("Wrap V")]]
+)
+[[ anno::display_name("Hexagonal Color "),
+   anno::in_group("Hexagonal"),
+   anno::author("Chris Perrella")]]
+{
+    if (!tex::texture_isvalid(tex)) {
+        return default_color;
+    }
+
+	color color_1   = tex::lookup_color( tex, tgs.uv_1, wrap_u: wrap_u, wrap_v: wrap_v );
+	color color_2   = tex::lookup_color( tex, tgs.uv_2, wrap_u: wrap_u, wrap_v: wrap_v );
+	color color_3   = tex::lookup_color( tex, tgs.uv_3, wrap_u: wrap_u, wrap_v: wrap_v );
+
+    float3 luminance_weight = float3(0.2126, 0.7152, 0.0722);
+	float3 color_weight 	= float3( math::dot( float3( color_1 ), luminance_weight ),
+									  math::dot( float3( color_2 ), luminance_weight ),
+									  math::dot( float3( color_3 ), luminance_weight ) );
+	
+    float3 w                = calculate_weight( tgs, color_weight );
+    float3 w2               = float3( w.x, w.x + w.y, w.x + w.y + w.z );
+
+    color c = color(default_color);
+    float noise = dithered_noise_ws();
+    c = (noise <= w2.z) ? color_3 : c; 
+    c = (noise <= w2.y) ? color_2 : c;
+    c = (noise <= w2.x) ? color_1 : c;
+
+    return c;
+}
+
+export float3 sample_float3_hex( triangle_grid_sample tgs
+                                [[anno::display_name("Triangle Grid")]],
+                                uniform texture_2d tex
+                                [[anno::display_name("Texture")]],
+                                float3 default_float3 = float3( 0.5 )
+                                [[anno::display_name("Default Color")]],   
+                                uniform tex::wrap_mode wrap_u = tex::wrap_repeat [[anno::display_name("Wrap U")]],
+                                uniform tex::wrap_mode wrap_v = tex::wrap_repeat [[anno::display_name("Wrap V")]]
+)
+[[ anno::display_name("Hexagonal Float3"),
+   anno::in_group("Hexagonal"),
+   anno::author("Chris Perrella")]]
+{
+	if (!tex::texture_isvalid(tex)) {
+        return default_float3;
+    }
+
+	float3 float3_1   = tex::lookup_float3( tex, tgs.uv_1, wrap_u: wrap_u, wrap_v: wrap_v );
+	float3 float3_2   = tex::lookup_float3( tex, tgs.uv_2, wrap_u: wrap_u, wrap_v: wrap_v );
+	float3 float3_3   = tex::lookup_float3( tex, tgs.uv_3, wrap_u: wrap_u, wrap_v: wrap_v );
+
+    float3 luminance_weight = float3(0.2126, 0.7152, 0.0722);
+	float3 color_weight 	= float3( math::dot( float3_1, luminance_weight ),
+									  math::dot( float3_2, luminance_weight ),
+									  math::dot( float3_3, luminance_weight ) );
+
+    float3 w                = calculate_weight( tgs, color_weight );
+    float3 w2               = float3( w.x, w.x + w.y, w.x + w.y + w.z );
+
+    float3 final_float3 = default_float3;
+    float noise = dithered_noise_ws();
+    final_float3 = (noise <= w2.z) ? float3_3 : final_float3; 
+    final_float3 = (noise <= w2.y) ? float3_2 : final_float3;
+    final_float3 = (noise <= w2.x) ? float3_1 : final_float3;
+
+    return final_float3;
+}
+
+export float sample_float_hex( triangle_grid_sample tgs
+                                [[anno::display_name("Triangle Grid")]],
+                               uniform texture_2d tex
+                               [[anno::display_name("Texture")]], 
+                               float default_float = 0.5
+                                [[anno::display_name("Default Color")]], 
+                               float4 channel_mask = float4(1,0,0,0) 
+                               [[anno::display_name("Channel Mask")]],
+                               uniform tex::wrap_mode wrap_u = tex::wrap_repeat [[anno::display_name("Wrap U")]],
+                               uniform tex::wrap_mode wrap_v = tex::wrap_repeat [[anno::display_name("Wrap V")]]
+)
+[[ anno::display_name("Hexagonal Float"),
+   anno::in_group("Hexagonal"),
+   anno::author("Chris Perrella")]]
+{
+    if (!tex::texture_isvalid(tex)) {
+        return default_float;
+    }
+
+	float float_1   = math::dot( tex::lookup_float4( tex, tgs.uv_1, wrap_u: wrap_u, wrap_v: wrap_v ), channel_mask );
+	float float_2   = math::dot( tex::lookup_float4( tex, tgs.uv_2, wrap_u: wrap_u, wrap_v: wrap_v  ), channel_mask );
+	float float_3   = math::dot( tex::lookup_float4( tex, tgs.uv_3, wrap_u: wrap_u, wrap_v: wrap_v ), channel_mask );
+
+	float3 float3_weight     = float3( float_1, float_2 , float_3 );
+    float3 w                 = calculate_weight( tgs, float3_weight );
+    float3 w2               = float3( w.x, w.x + w.y, w.x + w.y + w.z );
+
+    float final_float = default_float;
+    float noise = dithered_noise_ws();
+    final_float = (noise <= w2.z) ? float_3 : final_float; 
+    final_float = (noise <= w2.y) ? float_2 : final_float;
+    final_float = (noise <= w2.x) ? float_1 : final_float;
+
+    return final_float;
+}
+
+export float3 sample_normal_hex( triangle_grid_sample tgs
+                                [[anno::display_name("Triangle Grid")]],                              
+                                 uniform texture_2d tex
+                                 [[anno::display_name("Texture")]],
+                                 float3 default_normal = float3( 0.5, 0.5, 1 )
+                                [[anno::display_name("Default Color")]],                                  
+                                 uniform tex::wrap_mode wrap_u = tex::wrap_repeat [[anno::display_name("Wrap U")]],
+                                 uniform tex::wrap_mode wrap_v = tex::wrap_repeat [[anno::display_name("Wrap V")]]
+)
+[[ anno::display_name("Hexagonal Normal"),
+   anno::in_group("Hexagonal"),
+   anno::author("Chris Perrella")]]
+{
+	if (!tex::texture_isvalid(tex)) {
+        return state::normal();
+    }
+
+    float3 nrm_1 = tex::lookup_float3( tex, tgs.uv_1, wrap_u: wrap_u, wrap_v: wrap_v );
+    float3 nrm_2 = tex::lookup_float3( tex, tgs.uv_2, wrap_u: wrap_u, wrap_v: wrap_v );
+    float3 nrm_3 = tex::lookup_float3( tex, tgs.uv_3, wrap_u: wrap_u, wrap_v: wrap_v );
+
+    float3 lw = float3(0.2126, 0.7152, 0.0722);
+	float3 dw = float3( math::dot( float3( nrm_1 ), lw ),
+						math::dot( float3( nrm_2 ), lw ), 
+						math::dot( float3( nrm_3 ), lw ) );
+
+	nrm_1 = raw_to_normal( nrm_1 );
+	nrm_2 = raw_to_normal( nrm_2 );
+	nrm_3 = raw_to_normal( nrm_3 );
+
+	float3 n_1 = rotate_normal( nrm_1, tgs.a_1 );
+	float3 n_2 = rotate_normal( nrm_2, tgs.a_2 );
+	float3 n_3 = rotate_normal( nrm_3, tgs.a_3 );
+
+    n_1 = normal_to_raw( n_1 );
+    n_2 = normal_to_raw( n_2 );
+    n_3 = normal_to_raw( n_3 );
+
+	float3 w   = calculate_weight( tgs, dw );
+    float3 w2               = float3( w.x, w.x + w.y, w.x + w.y + w.z );
+
+    float3 n = default_normal;
+    float noise = dithered_noise_ws();
+    n = (noise <= w2.z) ? n_3 : n; 
+    n = (noise <= w2.y) ? n_2 : n;
+    n = (noise <= w2.x) ? n_1 : n;
+
+	return tbn(n);
+}
