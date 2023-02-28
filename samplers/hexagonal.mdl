@@ -5,6 +5,11 @@ import ::base::*;
 import ::state::*;
 import ::tex::*;
 import ::math::*;
+module [[
+    anno::version( 0, 0, 1),
+    anno::display_name("Hexagonal Nodes")
+]];
+
 
 export struct triangle_grid_sample
 {
@@ -270,8 +275,12 @@ export color sample_color_hex( triangle_grid_sample tgs
                                 [[anno::display_name("Wrap V")]]
 )
 [[ anno::display_name("Hexagonal Color "),
+   anno::thumbnail(".thumbs/hex.png"),
    anno::in_group("Hexagonal"),
-   anno::author("Chris Perrella")]]
+   anno::author("Chris Perrella"),
+   anno::contributor("Anders Langlands"),
+   anno::contributor("Morton Mikkelsen"),
+   anno::contributor("Giac Veltri")]]
 {
     if (!tex::texture_isvalid(tex)) {
         return default_color;
@@ -308,8 +317,12 @@ export float3 sample_float3_hex( triangle_grid_sample tgs
                                 uniform tex::wrap_mode wrap_v = tex::wrap_repeat [[anno::display_name("Wrap V")]]
 )
 [[ anno::display_name("Hexagonal Float3"),
+   anno::thumbnail(".thumbs/hex.png"),
    anno::in_group("Hexagonal"),
-   anno::author("Chris Perrella")]]
+   anno::author("Chris Perrella"),
+   anno::contributor("Anders Langlands"),
+   anno::contributor("Morton Mikkelsen"),
+   anno::contributor("Giac Veltri")]]
 {
 	if (!tex::texture_isvalid(tex)) {
         return default_float3;
@@ -348,8 +361,12 @@ export float sample_float_hex( triangle_grid_sample tgs
                                uniform tex::wrap_mode wrap_v = tex::wrap_repeat [[anno::display_name("Wrap V")]]
 )
 [[ anno::display_name("Hexagonal Float"),
+   anno::thumbnail(".thumbs/hex.png"),
    anno::in_group("Hexagonal"),
-   anno::author("Chris Perrella")]]
+   anno::author("Chris Perrella"),
+   anno::contributor("Anders Langlands"),
+   anno::contributor("Morton Mikkelsen"),
+   anno::contributor("Giac Veltri")]]
 {
     if (!tex::texture_isvalid(tex)) {
         return default_float;
@@ -382,8 +399,12 @@ export float3 sample_normal_hex( triangle_grid_sample tgs
                                  uniform tex::wrap_mode wrap_v = tex::wrap_repeat [[anno::display_name("Wrap V")]]
 )
 [[ anno::display_name("Hexagonal Normal"),
+   anno::thumbnail(".thumbs/hex.png"),
    anno::in_group("Hexagonal"),
-   anno::author("Chris Perrella")]]
+   anno::author("Chris Perrella"),
+   anno::contributor("Anders Langlands"),
+   anno::contributor("Morton Mikkelsen"),
+   anno::contributor("Giac Veltri")]]
 {
 	if (!tex::texture_isvalid(tex)) {
         return state::normal();

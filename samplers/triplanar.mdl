@@ -4,7 +4,11 @@ import ::anno::*;
 import ::base::*;
 import ::state::*;
 import ::tex::*;
-import ::math::*;   
+import ::math::*;
+module [[
+    anno::version( 0, 0, 1),
+    anno::display_name("Triplanar Nodes")
+]];
 
 export float3 tbn(
 	float3 raw_normal,
@@ -67,8 +71,10 @@ export color triplanar_color(
     [[anno::display_name("Tiling")]]
 )
 [[ anno::display_name("TriPlanar Color"),
+   anno::thumbnail(".thumbs/triplanar.png"),
    anno::in_group("TriPlanar"),
-   anno::author("Chris Perrella")]]
+   anno::author("Chris Perrella")
+   ]]
 {
     float3 uvs, weights;
     weights         = triplanar_weights();
@@ -96,6 +102,7 @@ export float4 triplanar_float4(
     [[anno::display_name("Tiling")]]
 )
 [[ anno::display_name("TriPlanar Float4"),
+   anno::thumbnail(".thumbs/triplanar.png"),
    anno::in_group("TriPlanar"),
    anno::author("Chris Perrella")]]
 {
@@ -126,6 +133,7 @@ export float3 triplanar_normal(
     [[anno::display_name("Tiling")]]
 )
 [[ anno::display_name("TriPlanar Normal"),
+   anno::thumbnail(".thumbs/triplanar.png"),
    anno::in_group("TriPlanar"),
    anno::author("Chris Perrella")]]
 {
