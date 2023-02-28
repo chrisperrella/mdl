@@ -54,7 +54,7 @@ export float3 worldspace_coordinates(
 
 export float3 triplanar_weights(
 )[[ anno::hidden() ]]{
-    float3 blend = math::abs(state::normal());
+    float3 blend = math::abs(state::geometry_normal());
     blend = math::max(blend - 0.2, 0);
     blend /= math::dot(blend, float3(1,1,1));
     return blend;
