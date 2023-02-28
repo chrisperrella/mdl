@@ -63,140 +63,102 @@ export float3 normal_to_raw(
     return normal * 0.5 + 0.5;
 }
 
-export float2 hex_center(int2 vertex)[[ anno::hidden() ]]{
-    float2x2 inv_skew = float2x2(1.0, 0.5, 0.0, 1.0 / 1.15470054);
-    return (vertex * inv_skew) / (2.0 * math::sqrt(3.0));
+export float2 hex_center( int2 vtx )[[ anno::hidden() ]]{
+    float2x2 skew = float2x2( 1.f, 0.5f, 0.0, 1.f / 1.15470054 );
+    return ( vtx * skew ) / ( 2.f * math::sqrt( 3.0 ) );
 }
 
-export float get_rotation_angle(int2 idx)[[ anno::hidden() ]]{
-    float angle_in = math::abs(idx.x * idx.y) + math::abs(idx.x + idx.y) + math::PI;
-
-    // remap to +/- pi
-    float angle = math::fmod(angle_in, 2 * math::PI);
-    if (angle < 0) angle += 2 * math::PI;
-    if (angle > math::PI) angle -= 2 * math::PI;
-    return angle;
+export float rotation_angle( int2 x )[[ anno::hidden() ]]{
+    float y = math::abs( x.x * x.y ) + math::abs( x.x + x.y ) + math::PI;
+    float a = math::fmod( y, 2 * math::PI );
+    if ( a < 0 ) a += 2 * math::PI;
+    if ( a > math::PI ) a -= 2 * math::PI;
+    return a;
 }
 
-export float2x2 rotation_2d(float angle)[[ anno::hidden() ]]{
-    float c = math::cos(angle);
-    float s = math::sin(angle);
-
-    return float2x2(c, -s, s, c);
+export float2x2 rotation_2d( float angle )[[ anno::hidden() ]]{
+    float c = math::cos( angle );
+    float s = math::sin( angle );
+    return float2x2( c, -s, s, c );
 }
 
 export float3 rotate_normal(
     float3 normal,
     float angle
 )[[ anno::hidden() ]]{
-    float  c              = math::cos(angle);
-    float  s              = math::sin(angle);
+    float  c              = math::cos( angle );
+    float  s              = math::sin( angle );
     float3 rotated_normal = normal;
 	rotated_normal.x      = c * normal.x + s * normal.y;
 	rotated_normal.y      = c * normal.y - s * normal.x;
     return rotated_normal;
 }
 
-export int pcg(int v)[[ anno::hidden() ]]{
+export int pcg( int v )[[ anno::hidden() ]]{
     int state = v * 747796405 + 2891336453;
-    int word = ((state >>> ((state >>> 28) + 4)) ^ state) * 277803737;
-    return (word >>> 22) ^ word;
+    int word = ( ( state >>> ( ( state >>> 28 ) + 4 ) ) ^ state ) * 277803737;
+    return ( word >>> 22 ) ^ word;
 }
 
-export int2 pcg2d(int2 v)[[ anno::hidden() ]]{
+export int2 pcg_2d( int2 v )[[ anno::hidden() ]]{
     v = v * 1664525 + 1013904223;
-
     v.x += v.y * 1664525;
     v.y += v.x * 1664525;
-
-    v = v ^ (v >>> 16);
-
+    v = v ^ ( v >>> 16 );
     v.x += v.y * 1664525;
     v.y += v.x * 1664525;
-
-    v = v ^ (v >>> 16);
-
+    v = v ^ ( v >>> 16 );
     return v;
 }
 
-export int3 pcg3d(int3 v)[[ anno::hidden() ]]{
-    v = v * 1664525 + 1013904223;
-
-    v.x += v.y*v.z;
-    v.y += v.z*v.x;
-    v.z += v.x*v.y;
-
-    v ^= v >>> 16;
-
-    v.x += v.y*v.z;
-    v.y += v.z*v.x;
-    v.z += v.x*v.y;
-
-    return v;
-}
-
-export int4 pcg4d(int4 v)[[ anno::hidden() ]]{
-    v = v * 1664525 + 1013904223;
-    
-    v.x += v.y*v.w;
-    v.y += v.z*v.x;
-    v.z += v.x*v.y;
-    v.w += v.y*v.z;
-    
-    v ^= v >>> 16;
-    
-    v.x += v.y*v.w;
-    v.y += v.z*v.x;
-    v.z += v.x*v.y;
-    v.w += v.y*v.z;
-    
-    return v;
-}
-
-export float uni01(int i)[[ anno::hidden() ]]{
-    if (i >= 0) {
-        return float(i) / 4294967295.0;
+export float uni_01( int i )[[ anno::hidden() ]]{
+    if ( i >= 0 ) {
+        return float( i ) / 4294967295.0f;
     } else {
-        return float(i >>> 1)/ 2147483647.0;
+        return float( i >>> 1 ) / 2147483647.0f;
     }
 }
 
-export float2 uni01(int2 i)[[ anno::hidden() ]]{
-    return float2(uni01(i.x), uni01(i.y));
+export float2 uni_01( int2 i )[[ anno::hidden() ]]{
+    return float2( uni_01( i.x ), uni_01( i.y ) );
 }
 
-export float2 hash_2i_2f(int2 v)[[ anno::hidden() ]]{
-    return uni01(pcg2d(v));
+export float2 hash_2i_2f( int2 xy )[[ anno::hidden() ]]{
+    return uni_01( pcg_2d( xy ) );
 }
 
 export triangle_grid_sample initialize_triangle_grid(
-	float2 uv = float2(state::texture_coordinate(0).x, state::texture_coordinate(0).y)
+	float2 uv = float2( state::texture_coordinate( 0 ).x, 
+                        state::texture_coordinate( 0 ).y )
     [[ anno::display_name("UV Coordinates")]]
 )
 [[ anno::display_name("Triangle Grid"),
    anno::in_group("Hexagonal") ]]
 {
     triangle_grid_sample tgs;
-    uv *= 2 * math::sqrt(3.0);
+    uv *= 2.f * math::sqrt( 3.f );
 
-    float2x2 grid_to_skewed_grid = float2x2(1.0, -0.57735027, 0.0, 1.15470054);
+    float2x2 grid_to_skewed_grid = float2x2( 1.f, -0.57735027f, 0.f, 1.15470054f );
     float2 skewed_coord 		 = uv * grid_to_skewed_grid;
 
-    int2 base_id 	  = int2(math::floor(skewed_coord));
-    float2 frac_coord = math::frac(skewed_coord);
-    float3 temp 	  = float3(frac_coord.x, frac_coord.y, 0.0);
-    temp.z 			  = 1.0 - temp.x - temp.y;
+    int2 base_id 	  = int2( math::floor( skewed_coord ) );
+    float2 frac_coord = math::frac( skewed_coord );
+    float3 temp 	  = float3( frac_coord.x, frac_coord.y, 0.f );
+    temp.z 			  = 1.f - temp.x - temp.y;
 
-    float s 		= math::step(0.0, -temp.z);
-    float s2 		= 2 * s - 1;
+    float s 		= math::step( 0.f, -temp.z );
+    float s2 		= 2.f * s - 1.f;
 
     float w_1 		= -temp.z * s2;
     float w_2 		= s - temp.y * s2;
     float w_3 		= s - temp.x * s2;
 
-    int2 vertex_1 	 = int2( int(math::floor(skewed_coord.x) + s),       int(math::floor(skewed_coord.y) + s) );
-    int2 vertex_2    = int2( int(math::floor(skewed_coord.x) + s),       int(math::floor(skewed_coord.y) + (1 - s)) );
-    int2 vertex_3    = int2( int(math::floor(skewed_coord.x) + (1 - s)), int(math::floor(skewed_coord.y) + s) );
+    int2 vertex_1 	 = int2( int( math::floor( skewed_coord.x ) + s),          
+                             int( math::floor(skewed_coord.y) + s) );
+    int2 vertex_2    = int2( int( math::floor( skewed_coord.x ) + s),          
+                             int( math::floor(skewed_coord.y) + (1 - s)) );
+    int2 vertex_3    = int2( int( math::floor( skewed_coord.x ) + ( 1 - s ) ), 
+                             int( math::floor(skewed_coord.y) + s) );
 
     tgs.vertex_1     = vertex_1;
     tgs.vertex_2     = vertex_2;
@@ -206,9 +168,9 @@ export triangle_grid_sample initialize_triangle_grid(
     tgs.w_3         = w_3;
     tgs.base_id     = base_id;
 
-    float a_1 		= get_rotation_angle( vertex_1 );
-	float a_2 		= get_rotation_angle( vertex_2 );
-	float a_3 		= get_rotation_angle( vertex_3 );
+    float a_1 		= rotation_angle( vertex_1 );
+	float a_2 		= rotation_angle( vertex_2 );
+	float a_3 		= rotation_angle( vertex_3 );
 
 	float2x2 rot_1 	= rotation_2d( a_1 );
 	float2x2 rot_2 	= rotation_2d( a_2 );
@@ -252,13 +214,13 @@ export float dithered_noise_ws()[[ anno::hidden() ]]{
 }
 
 export float3 calculate_weight( triangle_grid_sample tgs,
-								float3 dw, 
+								float3 diffuse_weights, 
 								float contrast = 0.6f,
-								float weight_exponent = 7.0f )[[ anno::hidden() ]]{
+								float exponent = 7.0f )[[ anno::hidden() ]]{
 	
-	dw            = math::lerp( float3(1.0f), dw, contrast );
-	float3 weight = dw * math::pow( float3( tgs.w_1, tgs.w_2, tgs.w_3 ), weight_exponent );
-	weight 		 /= ( weight.x + weight.y + weight.z );
+	diffuse_weights            = math::lerp( float3(1.0f), diffuse_weights, contrast );
+	float3 weight              = diffuse_weights * math::pow( float3( tgs.w_1, tgs.w_2, tgs.w_3 ), exponent );
+	weight 		              /= ( weight.x + weight.y + weight.z );
 
 	return weight;
 }
@@ -415,7 +377,7 @@ export float3 sample_normal_hex( triangle_grid_sample tgs
     float3 nrm_3 = tex::lookup_float3( tex, tgs.uv_3, wrap_u: wrap_u, wrap_v: wrap_v );
 
     float3 lw = float3(0.2126, 0.7152, 0.0722);
-	float3 dw = float3( math::dot( float3( nrm_1 ), lw ),
+	float3 diffuse_weights = float3( math::dot( float3( nrm_1 ), lw ),
 						math::dot( float3( nrm_2 ), lw ), 
 						math::dot( float3( nrm_3 ), lw ) );
 
@@ -431,7 +393,7 @@ export float3 sample_normal_hex( triangle_grid_sample tgs
     n_2 = normal_to_raw( n_2 );
     n_3 = normal_to_raw( n_3 );
 
-	float3 w   = calculate_weight( tgs, dw );
+	float3 w   = calculate_weight( tgs, diffuse_weights );
     float3 w2               = float3( w.x, w.x + w.y, w.x + w.y + w.z );
 
     float3 n = default_normal;

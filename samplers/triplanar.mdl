@@ -14,9 +14,9 @@ export float3 tbn(
 	float3 raw_normal,
 	uniform int uv_index = 0
 )[[ anno::hidden() ]]{
-	float3 normal 	 = raw_normal * 2.0 - 1.0;
+	float3 normal 	 = raw_normal * 2.f - 1.f;
 	float2 normal_xy = float2( normal.x, normal.y );
-	float normal_z   = math::sqrt( math::saturate( 1.0 - math::dot( normal_xy, normal_xy ) ) );
+	float normal_z   = math::sqrt( math::saturate( 1.f - math::dot( normal_xy, normal_xy ) ) );
 	normal.z 		 = normal_z;
 
 	base::texture_coordinate_info coord_info_uvw = base::coordinate_source( coordinate_system:
@@ -34,40 +34,39 @@ export float3 reoriented_normal_map(
     float3 normal,
     float3 detail
 )[[ anno::hidden() ]]{
-    normal += float3( 0.0f, 0.0f, 1.0f );
-    detail *= float3( -1, -1, 1 );
+    normal += float3( 0.f, 0.f, 1.f );
+    detail *= float3( -1.f, -1.f, 1.f );
     return normal * math::dot( normal, detail ) / normal.z - detail; 
 }
 
 export float3 unpack_normal(
     float3 normal
 )[[ anno::hidden() ]]{
-    normal = normal * 2.0f - 1.0f;
+    normal = normal * 2.f - 1.f;
     float normal_z = math::sqrt( 1.f - normal.x * normal.x - normal.y * normal.y );
     normal.z = normal_z;
     return normal;
 }
 
 export float3 worldspace_coordinates( 
-    float3 uv_tiling = float3(1.0f)
+    float3 uv_tiling = float3( 1.f )
 )[[ anno::hidden() ]]{
     float3 position = state::position();
-    position       *= uv_tiling;
-    return position;
+    return position * uv_tiling;
 }
 
 export float3 triplanar_weights(
 )[[ anno::hidden() ]]{
-    float3 blend = math::abs(state::geometry_normal());
-    blend = math::max(blend - 0.2, 0);
-    blend /= math::dot(blend, float3(1,1,1));
+    float3 blend = math::abs( state::geometry_normal() );
+    blend        = math::max( blend - 0.2, 0 );
+    blend       /= math::dot( blend, float3( 1.f ) );
     return blend;
 }
 
 export color triplanar_color(
     uniform texture_2d tex
     [[anno::display_name("Texture")]],
-    float3 uv_tiling = float3(1.0f)
+    float3 uv_tiling = float3( 1.0f )
     [[anno::display_name("Tiling")]]
 )
 [[ anno::display_name("TriPlanar Color"),
