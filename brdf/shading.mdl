@@ -1,0 +1,177 @@
+mdl 1.7;
+
+import ::df::*;
+import ::anno::*;
+import ::math::*;
+
+import ::state::normal;
+
+export material metallic_roughness_bsdf(
+    color basecolor = color(0.18f, 0.18f, 0.18f) [[
+        anno::display_name("Base Color"),
+        anno::ui_order(0)
+    ]],
+    float metallic = 0.f [[
+        anno::display_name("Metallic"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(1)
+    ]],
+    float roughness = 0.5f [[
+        anno::display_name("Roughness"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(3)
+    ]],
+    float specular = 0.5f [[
+        anno::display_name("Specular"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(5)
+    ]],    
+    color emissive_color = color(0.f) [[
+        anno::display_name("Emissive Color"),
+        anno::group("Inputs"),
+        anno::ui_order(6)
+    ]],
+    float emissive_intensity = 1000.f [[
+        anno::display_name("Emissive Intensity"),
+        anno::group("Inputs"),
+        anno::ui_order(7)
+    ]],
+    float opacity = 1.f [[
+        anno::display_name("Opacity"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(8)
+    ]],
+    float3 normal = state::normal() [[
+        anno::display_name("Normal"),
+        anno::ui_order(9)
+    ]],
+    float3 displacement = float3(0.f) [[
+        anno::display_name("Displacement"),
+        anno::ui_order(10)
+    ]])
+[[
+    anno::display_name("Metallic Roughness BSDF"),
+    anno::in_group("BRDF"),
+    anno::author("Chris Perrella")
+]]
+ =
+    let {
+        float alpha = roughness * roughness;
+
+        bsdf dielectric_component = df::custom_curve_layer(
+            weight: 0.5,
+            normal_reflectivity: 0.08 * specular,
+            grazing_reflectivity: 1.0,
+            layer: df::microfacet_ggx_smith_bsdf(roughness_u: alpha),
+            base: df::diffuse_reflection_bsdf(tint: basecolor)
+        );
+
+        bsdf metallic_component = df::microfacet_ggx_smith_bsdf(tint: basecolor, roughness_u: alpha);
+
+        bsdf dielectric_metal_mix = df::normalized_mix(
+                                        components:
+                                            df::bsdf_component[](
+                                                df::bsdf_component(
+                                                    component: metallic_component,
+                                                    weight: metallic),
+                                                df::bsdf_component(
+                                                    component: dielectric_component,
+                                                    weight: 1.0 - metallic))
+        );
+
+        material_emission emissive_component = material_emission(
+            emission: df::diffuse_edf(),
+            intensity: emissive_color * emissive_intensity * ::math::PI,
+            mode: intensity_radiant_exitance
+        );
+        
+    } in
+        material(
+            surface: material_surface(
+                scattering: dielectric_metal_mix,
+                emission: emissive_component),
+            geometry: material_geometry(
+                normal: normal,
+                cutout_opacity: opacity,
+                displacement: displacement));
+
+export material metallic_roughness_transmission_bsdf(
+    color basecolor = color(0.18f, 0.18f, 0.18f) [[
+        anno::display_name("Base Color"),
+        anno::ui_order(0)
+    ]],
+    float metallic = 0.f [[
+        anno::display_name("Metallic"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(1)
+    ]],
+    float roughness = 0.5f [[
+        anno::display_name("Roughness"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(3)
+    ]],
+    float opacity = 1.f [[
+        anno::display_name("Opacity"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(5)
+    ]],
+    float3 normal = state::normal() [[
+        anno::display_name("Normal"),
+        anno::ui_order(6)
+    ]],
+    float3 displacement = float3(0.f) [[
+        anno::display_name("Displacement"),
+        anno::ui_order(8)
+    ]],
+    color backface_tint = color(0.5f) [[
+        anno::display_name("Back Tint"),
+        anno::ui_order(10)
+    ]],
+    color translucency = color(0.5f)
+    [[
+        anno::display_name("Translucency"),
+        anno::ui_order(11)
+    ]])
+[[
+    anno::display_name("Metallic Roughness Transmission BSDF"),
+    anno::in_group("BRDF"),
+    anno::author("Chris Perrella")
+]]
+ =
+    let {
+        material mtl = metallic_roughness_bsdf(
+            basecolor: basecolor,
+            metallic: metallic,
+            roughness: roughness,
+            opacity: opacity,
+            normal: normal,
+            displacement: displacement
+        );
+        
+        bsdf backface_bsdf =
+            df::color_weighted_layer
+            (
+                weight: translucency,
+                layer: df::diffuse_transmission_bsdf( tint: backface_tint ),
+                base: mtl.surface.scattering
+            );
+
+        float alpha = roughness * roughness;
+        bsdf mtl_backface = df::custom_curve_layer(
+            weight: 0.5,
+            normal_reflectivity: 0.08,
+            grazing_reflectivity: 1.0,
+            layer: df::microfacet_ggx_smith_bsdf(roughness_u: alpha),
+            base: backface_bsdf
+        );            
+
+        material_geometry geometry_func(
+            cutout_opacity: opacity,
+            normal: normal
+        );
+    } in
+        material(
+            thin_walled: true,
+            surface: material_surface(scattering: mtl.surface.scattering),
+            backface: material_surface(scattering: mtl_backface),
+            geometry: geometry_func);
