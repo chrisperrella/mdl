@@ -1,0 +1,128 @@
+mdl 1.7;
+
+import ::anno::*;
+import ::base::*;
+import ::state::*;
+import ::tex::*;
+import ::math::*;
+module [[
+    anno::version( 0, 0, 1),
+    anno::display_name("Combine Normals Nodes")
+]];
+
+export float3 raw_to_normal(
+    float3 raw = float3( 0.5f, 0.5f, 1.f )
+    [[ anno::display_name("Raw Normal") ]]
+)
+[[ anno::display_name("Raw to Normal"),
+    anno::in_group("Custom Normals"),
+    anno::author("Chris Perrella") ]]
+{
+	float3 normal = raw * 2.0 - 1.0;
+	float2 xy     = float2( normal.x, normal.y );
+	float  z      = math::sqrt( math::saturate( 1.0 - math::dot( xy, xy ) ) );
+    return math::normalize( float3( xy.x, xy.y, z ) );
+}
+
+export float3 normal_to_raw(
+    float3 normal = state::geometry_normal()
+    [[ anno::display_name("Normal")]]
+)
+[[ anno::display_name("Normal to Raw"),
+    anno::in_group("Custom Normals"),
+    anno::author("Chris Perrella") ]]
+{
+    return normal * 0.5 + 0.5;
+}
+
+export float3 rotate_normal(
+    float3 normal = state::geometry_normal()
+    [[ anno::display_name("Normal") ]],
+    float angle = 0.f
+    [[ anno::display_name("Angle") ]]
+)
+[[ anno::display_name("Rotate Normal"),
+    anno::in_group("Custom Normals"),
+    anno::author("Chris Perrella") ]]
+{
+    float  c              = math::cos( angle );
+    float  s              = math::sin( angle );
+    float3 rotated_normal = normal;
+	rotated_normal.x      = c * normal.x + s * normal.y;
+	rotated_normal.y      = c * normal.y - s * normal.x;
+    return rotated_normal;
+}
+
+export float3 generate_tbn(
+	float3 raw_normal = float3( 0.5f, 0.5f, 1.f )
+    [[ anno::display_name("Raw Normal") ]],
+    float3 tangent = state::texture_tangent_u(0)
+    [[ anno::display_name("Tangent") ]],
+    float3 bitangent = state::texture_tangent_v(0)
+    [[ anno::display_name("Bitangent") ]],
+	uniform int uv_index = 0
+    [[ anno::display_name("UV Index") ]]
+)[[ anno::hidden() ]]{
+	float3 normal 	 = raw_normal * 2.f - 1.f;
+	float2 normal_xy = float2( normal.x, normal.y );
+	float normal_z   = math::sqrt( math::saturate( 1.f - math::dot( normal_xy, normal_xy ) ) );
+	normal.z 		 = normal_z;
+
+	float3 T = tangent;
+    float3 B = bitangent;	
+	float3 N = state::geometry_normal();
+
+	normal = normal.x * T + normal.y * B + normal.z * N;
+	return math::normalize( normal );
+}
+
+export float3 tbn_custom(
+    float3 raw_normal = float3( 0.5f, 0.5f, 1.f )
+    [[ anno::display_name("Raw Normal") ]],
+    float3 tangent = normal_to_raw( state::texture_tangent_u(0) )
+    [[ anno::display_name("Tangent") ]],
+    float3 bitangent = normal_to_raw( state::texture_tangent_v(0) )
+    [[ anno::display_name("Bitangent") ]]
+)
+[[ anno::display_name("Generate Custom TBN"),
+    anno::in_group("Custom Normals"),
+    anno::author("Chris Perrella"),
+    anno::contributor("Giac Veltri")]]
+{
+    return generate_tbn( raw_normal: raw_normal, 
+                         tangent: math::normalize( tangent * 2.f - 1.f ), 
+                         bitangent: math::normalize( bitangent * 2.f - 1.f ) );
+}
+
+export float3 tbn(
+	float3 raw_normal
+    [[ anno::display_name("Raw Normal") ]],
+	uniform int uv_index = 0
+    [[ anno::display_name("UV Index") ]]
+)
+[[ anno::display_name("Generate TBN"),
+    anno::in_group("Custom Normals"),
+    anno::author("Chris Perrella"),
+    anno::contributor("Giac Veltri") ]]
+{
+	base::texture_coordinate_info coord_info_uvw = base::coordinate_source( coordinate_system:
+																			base::texture_coordinate_uvw,
+																			texture_space: uv_index );
+    return generate_tbn( raw_normal, coord_info_uvw.tangent_u, coord_info_uvw.tangent_v, uv_index );
+}
+
+export float3 combine_reoriented_normals(
+    float3 normal = normal_to_raw( state::geometry_normal() )
+    [[ anno::display_name("Base Normal") ]],
+    float3 detail = float3( 0.5f, 0.5f, 1.f )
+    [[ anno::display_name("Detail") ]]
+)
+[[ anno::display_name("Combine Normals"),
+    anno::in_group("Custom Normals"),
+    anno::author("Stephen Hill") ]]
+{
+    float3 t = normal_to_raw( normal ) * float3( 2,  2, 2 ) + float3(-1, -1,  0 );
+    float3 u = detail * float3(-2, -2, 2 ) + float3( 1,  1, -1 );
+    float3 r = t * math::dot( t, u ) - u * t.z;
+    return math::normalize( r );
+}
