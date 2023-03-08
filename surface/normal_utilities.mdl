@@ -7,7 +7,7 @@ import ::tex::*;
 import ::math::*;
 module [[
     anno::version( 0, 0, 1),
-    anno::display_name("Combine Normals Nodes")
+    anno::display_name("Normal Utilities Nodes")
 ]];
 
 export float3 raw_to_normal(
@@ -15,7 +15,7 @@ export float3 raw_to_normal(
     [[ anno::display_name("Raw Normal") ]]
 )
 [[ anno::display_name("Raw to Normal"),
-    anno::in_group("Custom Normals"),
+    anno::in_group("Normal Utilities"),
     anno::author("Chris Perrella") ]]
 {
 	float3 normal = raw * 2.0 - 1.0;
@@ -29,7 +29,7 @@ export float3 normal_to_raw(
     [[ anno::display_name("Normal")]]
 )
 [[ anno::display_name("Normal to Raw"),
-    anno::in_group("Custom Normals"),
+    anno::in_group("Normal Utilities"),
     anno::author("Chris Perrella") ]]
 {
     return normal * 0.5 + 0.5;
@@ -42,7 +42,7 @@ export float3 rotate_normal(
     [[ anno::display_name("Angle") ]]
 )
 [[ anno::display_name("Rotate Normal"),
-    anno::in_group("Custom Normals"),
+    anno::in_group("Normal Utilities"),
     anno::author("Chris Perrella") ]]
 {
     float  c              = math::cos( angle );
@@ -85,7 +85,7 @@ export float3 tbn_custom(
     [[ anno::display_name("Bitangent") ]]
 )
 [[ anno::display_name("Generate Custom TBN"),
-    anno::in_group("Custom Normals"),
+    anno::in_group("Normal Utilities"),
     anno::author("Chris Perrella"),
     anno::contributor("Giac Veltri")]]
 {
@@ -101,7 +101,7 @@ export float3 tbn(
     [[ anno::display_name("UV Index") ]]
 )
 [[ anno::display_name("Generate TBN"),
-    anno::in_group("Custom Normals"),
+    anno::in_group("Normal Utilities"),
     anno::author("Chris Perrella"),
     anno::contributor("Giac Veltri") ]]
 {
@@ -118,7 +118,7 @@ export float3 combine_reoriented_normals(
     [[ anno::display_name("Detail") ]]
 )
 [[ anno::display_name("Combine Normals"),
-    anno::in_group("Custom Normals"),
+    anno::in_group("Normal Utilities"),
     anno::author("Stephen Hill") ]]
 {
     float3 t = normal_to_raw( normal ) * float3( 2,  2, 2 ) + float3(-1, -1,  0 );
