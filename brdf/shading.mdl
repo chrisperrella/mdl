@@ -4,10 +4,10 @@ import ::df::*;
 import ::anno::*;
 import ::math::*;
 
-import ::state::normal;
+import ::state::geometry_normal;
 
 export material metallic_roughness_bsdf(
-    color basecolor = color(0.18f, 0.18f, 0.18f) [[
+    color basecolor = color(0.5f, 0.5f, 0.5f) [[
         anno::display_name("Base Color"),
         anno::ui_order(0)
     ]],
@@ -28,12 +28,10 @@ export material metallic_roughness_bsdf(
     ]],    
     color emissive_color = color(0.f) [[
         anno::display_name("Emissive Color"),
-        anno::group("Inputs"),
         anno::ui_order(6)
     ]],
     float emissive_intensity = 1000.f [[
         anno::display_name("Emissive Intensity"),
-        anno::group("Inputs"),
         anno::ui_order(7)
     ]],
     float opacity = 1.f [[
@@ -41,7 +39,7 @@ export material metallic_roughness_bsdf(
         anno::hard_range(0.f, 1.f),
         anno::ui_order(8)
     ]],
-    float3 normal = state::normal() [[
+    float3 normal = state::geometry_normal() [[
         anno::display_name("Normal"),
         anno::ui_order(9)
     ]],
@@ -96,7 +94,7 @@ export material metallic_roughness_bsdf(
                 displacement: displacement));
 
 export material metallic_roughness_transmission_bsdf(
-    color basecolor = color(0.18f, 0.18f, 0.18f) [[
+    color basecolor = color(0.5f, 0.5f, 0.5f) [[
         anno::display_name("Base Color"),
         anno::ui_order(0)
     ]],
@@ -115,7 +113,7 @@ export material metallic_roughness_transmission_bsdf(
         anno::hard_range(0.f, 1.f),
         anno::ui_order(5)
     ]],
-    float3 normal = state::normal() [[
+    float3 normal = state::geometry_normal() [[
         anno::display_name("Normal"),
         anno::ui_order(6)
     ]],
@@ -175,3 +173,81 @@ export material metallic_roughness_transmission_bsdf(
             surface: material_surface(scattering: mtl.surface.scattering),
             backface: material_surface(scattering: mtl_backface),
             geometry: geometry_func);
+
+export material clearcoat_bsdf(
+    material mtl = metallic_roughness_bsdf() [[
+        anno::display_name("Base Material"),
+        anno::ui_order(0)
+    ]],
+    color clearcoat_tint = color(1.f) [[
+        anno::display_name("Clearcoat Tint"),
+        anno::ui_order(10)
+    ]],
+    float clearcoat_transparency = 1.f [[
+        anno::display_name("Clearcoat Transparency"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(11)
+    ]],
+    float clearcoat_reflection_roughness = 0.1f [[
+        anno::display_name("Clearcoat Roughness"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(12)
+    ]],
+    float clearcoat_flatten = 1.f [[
+        anno::display_name("Clearcoat Flatten"),
+        anno::hard_range(0.f, 1.f),
+        anno::ui_order(13)
+    ]],
+    float clearcoat_ior = 1.56f [[
+        anno::hidden(),
+        anno::display_name("Clearcoat IOR"),
+        anno::hard_range(0.f, 10.f),
+        anno::ui_order(14)        
+    ]],
+    float3 clearcoat_normal = state::geometry_normal() [[
+        anno::display_name("Clearcoat Normal"),
+        anno::ui_order(15)
+    ]]
+) 
+[[
+    anno::display_name("Metallic Roughness Clearcoat BSDF"),
+    anno::in_group("BRDF"),
+    anno::author("Chris Perrella")
+]] 
+    = let {
+        float specular = 0.5;
+        float ior = ( specular - 1.f + 2.f * math::sqrt( specular ) ) / ( 1.f - specular );
+
+        bsdf clearcoat_bsdf = df::microfacet_ggx_smith_bsdf(
+            roughness_u: clearcoat_reflection_roughness * clearcoat_reflection_roughness,
+            roughness_v: clearcoat_reflection_roughness * clearcoat_reflection_roughness,
+            tint:        color(1.0f),
+            mode:        df::scatter_reflect
+        );
+
+        bsdf opaque_clearcoat = df::weighted_layer(
+            weight: clearcoat_transparency,
+            layer:	::df::tint( 
+                        tint: clearcoat_tint,
+                        base: mtl.surface.scattering),
+            base:	::df::diffuse_reflection_bsdf(
+                        tint: clearcoat_tint)
+        );
+
+        bsdf final_bsdf = df::fresnel_layer(
+            ior:     ior,
+            weight:  clearcoat_flatten,
+            layer:   clearcoat_bsdf,
+            base:    opaque_clearcoat,
+            normal:  clearcoat_normal
+        );  
+
+    } in material(
+        surface: material_surface(
+            scattering: final_bsdf,
+            emission:  mtl.surface.emission
+        ),
+        geometry: material_geometry(
+            normal: clearcoat_normal
+        )
+    );
